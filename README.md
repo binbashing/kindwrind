@@ -1,5 +1,5 @@
-# KinDWRinD
-Kubernetes in Docker With Registry in Docker (KinDWRinD) is a project that provides a Dockerized environment for running Kubernetes emphemeral clusters using KinD (Kubernetes in Docker).   The intent of this project is for CI/CD pipelines and quickly running Kubernetes locally.This repository contains the Dockerfile and GitHub Actions workflows necessary to build and push the Kindwrind Docker image to Docker Hub.
+# KinDwRinD
+Kubernetes in Docker With Registry in Docker (KinDwRinD) is a project that provides a Dockerized environment for running Kubernetes emphemeral clusters using KinD (Kubernetes in Docker).   The intent of this project is for CI/CD pipelines and quickly running Kubernetes locally.This repository contains the Dockerfile and GitHub Actions workflows necessary to build and push the Kindwrind Docker image to Docker Hub.
 
 ## Usage
 
