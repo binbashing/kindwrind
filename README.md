@@ -22,7 +22,7 @@ docker cli
 ```
 docker run -d \
     --privileged \
-    --name kindind \
+    --name kindwrind \
     -p 6443:6443 \
     -p 5000:5000 \
     -v ~/.kube:/kubeconfig \
