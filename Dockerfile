@@ -7,7 +7,7 @@ ARG TARGETPLATFORM
 # Set default value for the platform argument (if not provided during build)
 
 # Install necessary dependencies
-RUN apk add --no-cache curl go kubectl
+RUN apk add --no-cache curl kubectl
 
 # Extract the architecture name from the platform argument
 # This assumes that the platform argument follows the format 'linux/{architecture}'
