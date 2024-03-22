@@ -9,12 +9,8 @@ ARG TARGETPLATFORM
 # Install necessary dependencies
 RUN apk add --no-cache curl kubectl
 
-# Extract the architecture name from the platform argument
-# This assumes that the platform argument follows the format 'linux/{architecture}'
-# We'll use parameter expansion to remove the 'linux/' prefix
-# For example, if PLATFORM=linux/arm64, then ARCH=arm64
+# Install KinD
 RUN ARCH=$(echo $TARGETPLATFORM | cut -d'/' -f2) && \
-    echo "Building for $ARCH" && \
     # Download and install KinD based on the architecture
     curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.22.0/kind-linux-$ARCH && \
     chmod +x ./kind && \
