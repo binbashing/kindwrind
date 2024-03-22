@@ -24,11 +24,14 @@ jobs:
         id: get_sha
         run: echo "::set-output name=sha::$(git rev-list -n 1 ${{ github.event.release.tag_name }})"
 
-      - name: Pull Docker image matching Git SHA
-        run: docker pull binbashing/kindwrind:${{ steps.get_sha.outputs.sha }}
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Tag Docker image with Release Tag
-        run: docker tag binbashing/kindwrind:${{ steps.get_sha.outputs.sha }} binbashing/kindwrind:${{ github.event.release.tag_name }}
-
-      - name: Push tagged Docker image
-        run: docker push binbashing/kindwrind:${{ github.event.release.tag_name }}
+      - name: Pull, tag, and push Docker image for each architecture
+        run: |
+          for arch in amd64 arm64; do
+            digest=$(docker manifest inspect binbashing/kindwrind:${{ steps.get_sha.outputs.sha }} | jq -r ".manifests[] | select(.platform.architecture==\"$arch\") | .digest")
+            docker pull binbashing/kindwrind@$digest
+            docker tag binbashing/kindwrind@$digest binbashing/kindwrind:${{ github.event.release.tag_name }}-$arch
+            docker push binbashing/kindwrind:${{ github.event.release.tag_name }}-$arch
+          done
