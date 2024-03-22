@@ -5,7 +5,6 @@ FROM docker:dind
 ARG TARGETPLATFORM
 
 # Set default value for the platform argument (if not provided during build)
-ARG TARGETPLATFORM=linux/amd64
 
 # Install necessary dependencies
 RUN apk add --no-cache curl go kubectl
