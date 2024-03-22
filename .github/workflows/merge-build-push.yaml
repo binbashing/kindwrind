@@ -9,9 +9,6 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        platforms: [linux/arm64]
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -34,4 +31,4 @@ jobs:
           tags: |
             binbashing/kindwrind:latest
             binbashing/kindwrind:${{ github.sha }}
-          platforms: ${{ join(matrix.platforms, ',') }}
+          platforms: linux/amd64,linux/arm64
