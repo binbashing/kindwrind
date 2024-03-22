@@ -32,3 +32,5 @@ jobs:
             binbashing/kindwrind:latest
             binbashing/kindwrind:${{ github.sha }}
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            PLATFORM=${{ matrix.platform }}

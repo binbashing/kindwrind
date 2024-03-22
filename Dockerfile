@@ -18,7 +18,6 @@ RUN echo "PLATFORM: $PLATFORM" && \
     ARCH=$(echo $PLATFORM | cut -d'/' -f2) && \
     echo "ARCH: $ARCH" && \
     echo "Building for $ARCH" && \
-    # Download and install KinD based on the architecture
     curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.22.0/kind-linux-$ARCH && \
     chmod +x ./kind && \
     mv ./kind /bin/kind && \
