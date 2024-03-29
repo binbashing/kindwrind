@@ -2,6 +2,15 @@
 
 set -e
 
+handle_sigterm() {
+    echo "SIGTERM received, deleting cluster ..."
+    /usr/bin/kind delete cluster stop
+    exit 0
+}
+
+# Setup SIGTERM handler
+trap handle_sigterm SIGTERM
+
 # Start the dockerd daemon and put it in the background
 dockerd-entrypoint.sh &
 
@@ -27,7 +36,5 @@ kind create cluster --config /kindind-config.yaml --name kindwrind --wait 5m
 # Setup Docker Registy
 docker run -d --name registry --restart=always --net=kind -p 5000:5000 registry:2
 
-# Gracefully shutdown the KinD cluster when this script exits
-trap 'kind delete cluster' 0 1 2 3 15
-tail -f /dev/null &
+# Keep script running to maintain control over the process and handle signals
 wait $!
