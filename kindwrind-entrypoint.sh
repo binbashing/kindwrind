@@ -22,10 +22,7 @@ if ! docker version >/dev/null 2>&1; then
 fi
 
 # Create KinD cluster
-kind create cluster --config /kindind-config.yaml --name kindind --wait 5m
-
-# Configure kubectl
-# chmod 777 /root/.kube/config
+kind create cluster --config /kindind-config.yaml --name kindwrind --wait 5m
 
 # Setup Docker Registy
 docker run -d --name registry --restart=always --net=kind -p 5000:5000 registry:2
