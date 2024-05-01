@@ -4,12 +4,12 @@ set -e
 
 handle_sigterm() {
     echo "SIGTERM received, deleting cluster ..."
-    /usr/bin/kind delete cluster stop
+    kind delete cluster --name kindwrind
     exit 0
 }
 
 # Setup SIGTERM handler
-trap handle_sigterm SIGTERM
+trap handle_sigterm TERM
 
 # Start the dockerd daemon and put it in the background
 dockerd-entrypoint.sh &
@@ -17,17 +17,20 @@ dockerd-entrypoint.sh &
 # Wait for the dockerd daemon to be ready
 echo waiting for docker dind service...
 if ! docker version >/dev/null 2>&1; then
-	for i in $(seq 1 30); do
-		echo -n .
-		sleep 1
-		docker version >/dev/null 2>&1 && break
-	done
-	if [ $? = 0 ]; then
-		echo
-	else
-		echo >&2 "Timeout waiting for docker service"
-		exit 1
-	fi
+    count=0
+    while [ $count -lt 30 ]; do
+        printf '.'
+        sleep 1
+        if docker version >/dev/null 2>&1; then
+            echo
+            break
+        fi
+        count=$((count+1))
+    done
+    if [ $count -eq 30 ]; then
+        echo >&2 "Timeout waiting for docker service"
+        exit 1
+    fi
 fi
 
 # Create KinD cluster
