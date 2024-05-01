@@ -2,7 +2,7 @@
 ![Tag and Push](https://github.com/binbashing/kindwrind/actions/workflows/release-tag-push.yaml/badge.svg)
 
 # KinDwRinD
-[Kubernetes in Docker](https://kind.sigs.k8s.io/) With [Registry](https://docs.docker.com/registry/) in [Docker](https://hub.docker.com/_/docker) (KinDwRinD) is a project that provides a Dockerized environment for running an emphemeral Kubernetes cluster using KinD (Kubernetes in Docker).   The intent of this project is for CI/CD pipelines and quickly running Kubernetes locally. 
+[Kubernetes in Docker](https://kind.sigs.k8s.io/) with [Registry](https://docs.docker.com/registry/) in [Docker](https://hub.docker.com/_/docker) (KinDwRinD) is a project that provides a Dockerized environment for running an emphemeral Kubernetes cluster using KinD (Kubernetes in Docker).   The intent of this project is for CI/CD pipelines and quickly running Kubernetes locally. 
 
 ## Usage
 
