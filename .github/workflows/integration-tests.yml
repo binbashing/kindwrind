@@ -1,0 +1,118 @@
+name: KinDwRinD Integration Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-kindwrind:
+    name: Test KinDwRinD Functionality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build KinDwRinD image
+        run: docker build -t kindwrind-test .
+      
+      - name: Verify Docker command starts properly
+        run: |
+          # Test that the direct Docker command starts correctly
+          docker run -d \
+            --privileged \
+            --name kindwrind-direct \
+            -p 6444:6443 \
+            -p 5001:5000 \
+            -v /tmp/kube-direct:/kubeconfig \
+            kindwrind-test
+          
+          # Wait briefly and check container is running
+          sleep 10
+          if ! docker ps | grep -q kindwrind-direct; then
+            echo "Error: Direct Docker container failed to start"
+            docker logs kindwrind-direct
+            exit 1
+          fi
+          echo "Docker command approach verified"
+          docker stop kindwrind-direct
+
+      - name: Run using Docker Compose for full testing
+        run: |
+          # Modify the docker-compose.yml to use the local build
+          sed -i 's|image: binbashing/kindwrind|image: kindwrind-test|' docker-compose.yml
+          
+          # Modify volume mount for testing
+          sed -i 's|~/.kube:/kubeconfig|/tmp/kube-compose:/kubeconfig|' docker-compose.yml
+          
+          # Start with docker compose
+          docker compose up -d
+
+      - name: Wait for Kubernetes cluster (90s)
+        run: |
+          echo "Waiting for Kubernetes cluster to be ready..."
+          count=0
+          while [ $count -lt 90 ]; do
+            sleep 1
+            if docker exec kindwrind kubectl get nodes 2>/dev/null | grep -q "Ready"; then
+              echo "Kubernetes cluster is ready!"
+              break
+            fi
+            count=$((count+1))
+            if [ $((count % 10)) -eq 0 ]; then
+              echo "Still waiting... ($count/90s)"
+            fi
+          done
+          
+          if [ $count -eq 90 ]; then
+            echo "Timeout waiting for Kubernetes cluster"
+            docker logs kindwrind
+            exit 1
+          fi
+
+      - name: Test registry functionality
+        run: |
+          # Pull a test image
+          docker pull nginx:alpine
+          
+          # Tag for local registry
+          docker tag nginx:alpine localhost:5000/nginx-test:latest
+          
+          # Push to local registry
+          docker push localhost:5000/nginx-test:latest
+          
+          # Create deployment using the image from local registry
+          docker exec kindwrind kubectl create deployment test-nginx --image=localhost:5000/nginx-test:latest
+          
+          # Wait for deployment to be ready
+          count=0
+          while [ $count -lt 60 ]; do
+            sleep 1
+            if docker exec kindwrind kubectl get deployment test-nginx 2>/dev/null | grep -q "1/1"; then
+              echo "Deployment is ready!"
+              break
+            fi
+            count=$((count+1))
+            if [ $((count % 10)) -eq 0 ]; then
+              echo "Waiting for deployment... ($count/60s)"
+            fi
+          done
+          
+          if [ $count -eq 60 ]; then
+            echo "Deployment failed"
+            docker exec kindwrind kubectl describe deployment test-nginx
+            docker exec kindwrind kubectl describe pods -l app=test-nginx
+            exit 1
+          fi
+          
+          # Verify pod is running
+          docker exec kindwrind kubectl get pods -l app=test-nginx -o wide
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker compose down || true
