@@ -65,14 +65,9 @@ jobs:
 
       - name: Run using Docker Compose for full testing
         run: |
-          # Modify the docker-compose.yml to use the local build
-          sed -i 's|image: binbashing/kindwrind|image: kindwrind-test|' docker-compose.yml
-          
-          # Modify volume mount for testing
-          sed -i 's|~/.kube:/kubeconfig|/tmp/kube-compose:/kubeconfig|' docker-compose.yml
-          
-          # Start with docker compose
-          docker compose up -d
+          # Read VERSION file and start with docker compose
+          KIND_VERSION=$(cat VERSION)
+          KIND_VERSION=$KIND_VERSION docker compose up -d
 
       - name: Wait for Kubernetes cluster (90s)
         run: |

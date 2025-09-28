@@ -3,7 +3,16 @@
 ![Update Check](https://github.com/binbashing/kindwrind/actions/workflows/update-check.yaml/badge.svg)
 
 # KinDwRinD
-[Kubernetes in Docker](https://kind.sigs.k8s.io/) with [Registry](https://docs.docker.com/registry/) in [Docker](https://hub.docker.com/_/docker) (KinDwRinD) is a project that provides a Dockerized environment for running an emphemeral Kubernetes cluster using KinD (Kubernetes in Docker).   The intent of this project is for CI/CD pipelines and quickly running Kubernetes locally. 
+
+**Kubernetes in Docker with Registry in Docker** - A complete Kubernetes development environment in a single container.
+
+✅ **One command setup** - Get Kubernetes + Docker registry running instantly  
+✅ **CI/CD ready** - Perfect for GitHub Actions, GitLab CI, Jenkins  
+✅ **Local development** - Test Kubernetes deployments without complexity  
+✅ **Isolated & clean** - Completely contained, no host pollution  
+✅ **Multi-arch support** - Works on AMD64 and ARM64  
+✅ **Built-in health checks** - Docker health check monitors readiness  
+✅ **Always up-to-date** - Automated pipelines keep KinD and base images current
 
 ## Usage
 
@@ -14,14 +23,12 @@ docker-compose
 services:
     kindwrind:
         image: binbashing/kindwrind
-        container_name: kindwrind
+        privileged: true
         ports:
             - 6443:6443
             - 5000:5000
         volumes:
-            - ~/.kube:/kubeconfig
-        environment:
-            - KUBERNETES_VERSION  # Optional: specify Kubernetes version
+            - ${KUBECONFIG_DIR:-~/.kube}:/kubeconfig
 ```
 
 docker cli
@@ -31,21 +38,17 @@ docker run -d \
     --name kindwrind \
     -p 6443:6443 \
     -p 5000:5000 \
-    -v ~/.kube:/kubeconfig \
-    -e KUBERNETES_VERSION=v1.33.0 \
+    -v ${KUBECONFIG:-~/.kube/config}:/kubeconfig/config \
     binbashing/kindwrind
 ```
 
-> **Note**: You can optionally specify a Kubernetes version using the `KUBERNETES_VERSION` environment variable (e.g., `v1.33.0`). If not specified, KinD will use its default version.
+> **Note**: You can specify a custom Kubernetes version using the `KUBERNETES_VERSION` environment variable (e.g., `KUBERNETES_VERSION=v1.33.0`). When set, KinD will create the cluster using `--image kindest/node:$KUBERNETES_VERSION`.
 
 #### Example usage:
 
 ```bash
-# Start with default Kubernetes version
+# Start KinDwRinD
 docker compose up -d
-
-# OR start with specific Kubernetes version
-KUBERNETES_VERSION=v1.33.0 docker compose up -d
 
 # Pull a public image
 docker pull nginx:latest
