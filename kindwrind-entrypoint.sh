@@ -34,7 +34,13 @@ if ! docker version >/dev/null 2>&1; then
 fi
 
 # Create KinD cluster
-kind create cluster --config /kindind-config.yaml --name kindwrind --wait 5m
+if [ -n "$KUBERNETES_VERSION" ]; then
+    echo "Creating KinD cluster with Kubernetes version: $KUBERNETES_VERSION"
+    kind create cluster --config /kindind-config.yaml --name kindwrind --image "kindest/node:$KUBERNETES_VERSION" --wait 5m
+else
+    echo "Creating KinD cluster with default Kubernetes version"
+    kind create cluster --config /kindind-config.yaml --name kindwrind --wait 5m
+fi
 
 # Setup Docker Registy
 docker run -d --name registry --restart=always --net=kind -p 5000:5000 registry:2

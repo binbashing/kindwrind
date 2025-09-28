@@ -134,6 +134,74 @@ jobs:
           # Verify pod is running
           docker exec kindwrind kubectl get pods -l app=test-nginx -o wide
 
+      - name: Test default Kubernetes version (current behavior)
+        run: |
+          # Check the current Kubernetes version (should be whatever KinD defaults to)
+          K8S_VERSION=$(docker exec kindwrind kubectl version --client=false -o json | jq -r '.serverVersion.gitVersion')
+          echo "✅ Default Kubernetes version: $K8S_VERSION"
+
+      - name: Test custom Kubernetes version feature
+        run: |
+          # Stop current container
+          docker compose down || true
+          sleep 5
+          
+          # Test with a specific Kubernetes version (use a stable older version)
+          CUSTOM_K8S_VERSION="v1.27.3"
+          echo "Testing with custom Kubernetes version: $CUSTOM_K8S_VERSION"
+          
+          # Add KUBERNETES_VERSION environment variable to docker-compose.yml
+          sed -i '/volumes:/i\        environment:' docker-compose.yml
+          sed -i "/environment:/a\            - KUBERNETES_VERSION=$CUSTOM_K8S_VERSION" docker-compose.yml
+          
+          # Start with custom version
+          docker compose up -d
+          
+          # Wait for cluster with custom version (longer timeout since it needs to pull image)
+          echo "Waiting for custom Kubernetes cluster to be ready..."
+          count=0
+          while [ $count -lt 120 ]; do
+            sleep 1
+            if docker exec kindwrind kubectl get nodes 2>/dev/null | grep -q "Ready"; then
+              echo "Custom Kubernetes cluster is ready!"
+              break
+            fi
+            count=$((count+1))
+            if [ $((count % 15)) -eq 0 ]; then
+              echo "Still waiting for custom cluster... ($count/120s)"
+            fi
+          done
+          
+          if [ $count -eq 120 ]; then
+            echo "Timeout waiting for custom Kubernetes cluster"
+            docker logs kindwrind
+            exit 1
+          fi
+          
+          # Verify the custom version is actually being used
+          ACTUAL_VERSION=$(docker exec kindwrind kubectl version --client=false -o json | jq -r '.serverVersion.gitVersion')
+          echo "Actual Kubernetes version: $ACTUAL_VERSION"
+          
+          if [ "$ACTUAL_VERSION" = "$CUSTOM_K8S_VERSION" ]; then
+            echo "✅ Custom Kubernetes version test passed!"
+          else
+            echo "❌ Custom Kubernetes version test failed!"
+            echo "Expected: $CUSTOM_K8S_VERSION"
+            echo "Actual: $ACTUAL_VERSION"
+            exit 1
+          fi
+          
+          # Quick functionality test with custom version
+          docker exec kindwrind kubectl create deployment test-custom --image=nginx:alpine
+          sleep 10
+          if docker exec kindwrind kubectl get deployment test-custom 2>/dev/null | grep -q "1/1"; then
+            echo "✅ Custom version deployment test passed!"
+          else
+            echo "❌ Custom version deployment test failed!"
+            docker exec kindwrind kubectl describe deployment test-custom
+            exit 1
+          fi
+
       - name: Clean up
         if: always()
         run: |
