@@ -14,11 +14,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Read version information
+        id: version
+        run: |
+          # Read KinD version from VERSION file - it must exist
+          if [ -f VERSION ]; then
+            KIND_VERSION=$(cat VERSION)
+          else
+            echo "ERROR: VERSION file not found!"
+            exit 1
+          fi
+          echo "kind_version=${KIND_VERSION}" >> $GITHUB_OUTPUT
+          echo "Using KinD version: ${KIND_VERSION}"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
       - name: Build KinDwRinD image
-        run: docker build -t kindwrind-test .
+        run: |
+          docker build \
+            --build-arg KIND_VERSION=${{ steps.version.outputs.kind_version }} \
+            -t kindwrind-test .
       
       - name: Verify Docker command starts properly
         run: |

@@ -17,6 +17,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       
+      - name: Read version information
+        id: version
+        run: |
+          # Read KinD version from VERSION file
+          KIND_VERSION=$(cat VERSION)
+          echo "kind_version=${KIND_VERSION}" >> $GITHUB_OUTPUT
+          echo "KinD version: ${KIND_VERSION}"
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
@@ -34,8 +42,11 @@ jobs:
           push: true
           tags: |
             binbashing/kindwrind:latest
+            binbashing/kindwrind:v${{ steps.version.outputs.kind_version }}
             binbashing/kindwrind:${{ github.sha }}
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            KIND_VERSION=${{ steps.version.outputs.kind_version }}
 
       - name: Update repo description
         uses: peter-evans/dockerhub-description@v3

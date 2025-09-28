@@ -1,0 +1,135 @@
+name: Check KinD Version Updates
+
+on:
+  schedule:
+    # Run every day at 6 AM UTC to check for new KinD releases
+    - cron: '0 6 * * *'
+  workflow_dispatch: # Allow manual triggering
+    inputs:
+      create_pr:
+        description: 'Create PR for version update'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  check-kind-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Get current KinD version from VERSION file
+        id: current_version
+        run: |
+          CURRENT_KIND_VERSION=$(cat VERSION)
+          echo "current_kind_version=${CURRENT_KIND_VERSION}" >> $GITHUB_OUTPUT
+          echo "Current KinD version: ${CURRENT_KIND_VERSION}"
+
+      - name: Get latest KinD version from GitHub API
+        id: latest_version
+        run: |
+          LATEST_KIND_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+          echo "latest_kind_version=${LATEST_KIND_VERSION}" >> $GITHUB_OUTPUT
+          echo "Latest KinD version: ${LATEST_KIND_VERSION}"
+          
+          # Get release info
+          RELEASE_URL=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | jq -r '.html_url')
+          RELEASE_DATE=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | jq -r '.published_at')
+          echo "release_url=${RELEASE_URL}" >> $GITHUB_OUTPUT
+          echo "release_date=${RELEASE_DATE}" >> $GITHUB_OUTPUT
+
+      - name: Compare versions
+        id: version_check
+        run: |
+          CURRENT="${{ steps.current_version.outputs.current_kind_version }}"
+          LATEST="${{ steps.latest_version.outputs.latest_kind_version }}"
+          
+          if [ "${CURRENT}" != "${LATEST}" ]; then
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+            echo "Version change detected: ${CURRENT} -> ${LATEST}"
+          else
+            echo "version_changed=false" >> $GITHUB_OUTPUT
+            echo "No version change detected"
+          fi
+
+      - name: Update version files
+        if: steps.version_check.outputs.version_changed == 'true'
+        run: |
+          LATEST_VERSION="${{ steps.latest_version.outputs.latest_kind_version }}"
+          
+          # Update VERSION file with new KinD version
+          echo "${LATEST_VERSION}" > VERSION
+
+          git add VERSION
+          git commit -m "chore: update KinD version to ${{ steps.latest_version.outputs.latest_kind_version }}" || echo "No changes to commit"
+          git push
+          
+      - name: Create Pull Request
+        if: steps.version_check.outputs.version_changed == 'true' && (github.event.inputs.create_pr != 'false')
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update KinD version to ${{ steps.latest_version.outputs.latest_kind_version }}"
+          title: "Update KinD version to ${{ steps.latest_version.outputs.latest_kind_version }}"
+          body: |
+            ## KinD Version Update
+            
+            This PR updates KinD from version `${{ steps.current_version.outputs.current_kind_version }}` to `${{ steps.latest_version.outputs.latest_kind_version }}`.
+            
+            ### Changes
+            - Updated `VERSION` file with new KinD version: `${{ steps.latest_version.outputs.latest_kind_version }}`
+            - KinD release: ${{ steps.latest_version.outputs.release_url }}
+            - Release date: ${{ steps.latest_version.outputs.release_date }}
+            
+            ### Testing
+            The integration tests will run automatically to verify the new version works correctly.
+            
+            ### Release Notes
+            Please review the [KinD release notes](${{ steps.latest_version.outputs.release_url }}) for any breaking changes or important updates.
+            
+            ---
+            *This PR was created automatically by the version check workflow*
+          branch: update-kind-${{ steps.latest_version.outputs.latest_kind_version }}
+          delete-branch: true
+
+      - name: Create Issue if PR creation disabled
+        if: steps.version_check.outputs.version_changed == 'true' && github.event.inputs.create_pr == 'false'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const latestVersion = '${{ steps.latest_version.outputs.latest_kind_version }}';
+            const currentVersion = '${{ steps.current_version.outputs.current_kind_version }}';
+            const releaseUrl = '${{ steps.latest_version.outputs.release_url }}';
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `New KinD version available: ${latestVersion}`,
+              body: `A new KinD version is available.
+              
+              **Current version:** ${currentVersion}
+              **New version:** ${latestVersion}
+              **Release:** ${releaseUrl}
+              
+              Consider updating the project to use the new version.`,
+              labels: ['enhancement', 'version-update']
+            });
+
+      - name: Summary
+        run: |
+          echo "## Version Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Current KinD version: ${{ steps.current_version.outputs.current_kind_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Latest KinD version: ${{ steps.latest_version.outputs.latest_kind_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Version changed: ${{ steps.version_check.outputs.version_changed }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.version_check.outputs.version_changed }}" == "true" ]; then
+            echo "- ✅ Version update detected and processed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ✅ No updates needed" >> $GITHUB_STEP_SUMMARY
+          fi

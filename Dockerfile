@@ -1,18 +1,24 @@
 # Use Docker-in-Docker base image
 FROM docker:dind
 
-# Define a build argument for the platform
+# Define build arguments
 ARG TARGETPLATFORM
+ARG KIND_VERSION
 
-# Set default value for the platform argument (if not provided during build)
+# Set build-time labels
+LABEL org.opencontainers.image.version="${KIND_VERSION}"
+LABEL org.opencontainers.image.title="KinDwRinD"
+LABEL org.opencontainers.image.description="Kubernetes in Docker with Registry in Docker"
+LABEL kindwrind.kind.version="${KIND_VERSION}"
+LABEL kindwrind.version="${KIND_VERSION}"
 
 # Install necessary dependencies
 RUN apk add --no-cache curl kubectl
 
-# Install KinD
+# Install KinD with version from build argument
 RUN ARCH=$(echo $TARGETPLATFORM | cut -d'/' -f2) && \
-    # Download and install KinD based on the architecture
-    curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.22.0/kind-linux-$ARCH && \
+    # Download and install KinD based on the architecture and version from build argument
+    curl -Lo ./kind https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-$ARCH && \
     chmod +x ./kind && \
     mv ./kind /bin/kind && \
     mkdir /kubeconfig
