@@ -21,7 +21,7 @@ services:
         volumes:
             - ~/.kube:/kubeconfig
         environment:
-            - KUBERNETES_VERSION=v1.28.0  # Optional: specify Kubernetes version
+            - KUBERNETES_VERSION  # Optional: specify Kubernetes version
 ```
 
 docker cli
@@ -32,16 +32,20 @@ docker run -d \
     -p 6443:6443 \
     -p 5000:5000 \
     -v ~/.kube:/kubeconfig \
-    -e KUBERNETES_VERSION=v1.28.0 \
+    -e KUBERNETES_VERSION=v1.33.0 \
     binbashing/kindwrind
 ```
 
-> **Note**: The `KUBERNETES_VERSION` environment variable is optional. If not specified, KinD will use its default Kubernetes version. Use format like `v1.28.0`, `v1.27.3`, etc.
+> **Note**: You can optionally specify a Kubernetes version using the `KUBERNETES_VERSION` environment variable (e.g., `v1.33.0`). If not specified, KinD will use its default version.
+
 #### Example usage:
 
 ```bash
-# Start KinDwRinD
+# Start with default Kubernetes version
 docker compose up -d
+
+# OR start with specific Kubernetes version
+KUBERNETES_VERSION=v1.33.0 docker compose up -d
 
 # Pull a public image
 docker pull nginx:latest

@@ -8,3 +8,5 @@ services:
       - 5000:5000
     volumes:
       - ~/.kube:/kubeconfig
+    environment:
+      - KUBERNETES_VERSION
