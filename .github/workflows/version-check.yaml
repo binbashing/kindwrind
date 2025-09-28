@@ -69,6 +69,26 @@ jobs:
           git add VERSION
           git commit -m "chore: update KinD version to ${{ steps.latest_version.outputs.latest_kind_version }}" || echo "No changes to commit"
           git push
+
+      - name: Keepalive commit
+        if: steps.version_check.outputs.version_changed == 'false'
+        run: |
+          # Prevent workflow suspension by making empty commits after 50+ days of inactivity
+          LAST_COMMIT_DATE=$(git log -1 --format=%ct)
+          CURRENT_DATE=$(date +%s)
+          DAYS_SINCE=$((($CURRENT_DATE - $LAST_COMMIT_DATE) / 86400))
+          
+          echo "Days since last commit: $DAYS_SINCE"
+          
+          if [ $DAYS_SINCE -gt 50 ]; then
+            echo "Making keepalive commit to prevent workflow suspension"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "chore: keepalive commit to prevent workflow suspension (${DAYS_SINCE} days since last activity)"
+            git push
+          else
+            echo "No keepalive commit needed (last commit was $DAYS_SINCE days ago)"
+          fi
           
       - name: Create Pull Request
         if: steps.version_check.outputs.version_changed == 'true' && (github.event.inputs.create_pr != 'false')
