@@ -1,6 +1,6 @@
 ![Build and Push](https://github.com/binbashing/kindwrind/actions/workflows/merge-build-push.yaml/badge.svg)
 ![Integration Tests](https://github.com/binbashing/kindwrind/actions/workflows/integration-tests.yml/badge.svg)
-![Version Check](https://github.com/binbashing/kindwrind/actions/workflows/version-check.yaml/badge.svg)
+![Update Check](https://github.com/binbashing/kindwrind/actions/workflows/update-check.yaml/badge.svg)
 
 # KinDwRinD
 [Kubernetes in Docker](https://kind.sigs.k8s.io/) with [Registry](https://docs.docker.com/registry/) in [Docker](https://hub.docker.com/_/docker) (KinDwRinD) is a project that provides a Dockerized environment for running an emphemeral Kubernetes cluster using KinD (Kubernetes in Docker).   The intent of this project is for CI/CD pipelines and quickly running Kubernetes locally. 
@@ -50,6 +50,32 @@ docker push localhost:5000/nginx:latest
 ## Create a Kubernetes deployment using the local registry image
 kubectl create deployment hello-server --image=localhost:5000/nginx:latest 
 ```
+
+## Automated Updates
+
+```mermaid
+flowchart TD
+    A["Daily Check (6AM UTC)"] --> B{"Updates Found?"}
+    
+    B -->|"KinD Version"| C["Create PR"]
+    B -->|"Docker DinD"| D["Run Tests"]
+    B -->|"None"| E["Keepalive"]
+    
+    D --> F["Integration Tests"]
+    F -->|"Pass"| G["Build & Push"]
+    F -->|"Fail"| H["Stop"]
+    
+    I["PR Activity"] --> J["Integration Tests"]
+    K["Push/Merge to Main"] --> L["Integration Tests"]
+    L -->|"Pass"| M["Build & Push"]
+    L -->|"Fail"| N["Stop"]
+```
+
+- **Daily**: Checks for KinD releases and Docker base image updates
+- **KinD Updates**: Creates PR for manual review  
+- **Docker Updates**: Automatically tests and rebuilds if base image is newer
+- **Main Branch**: Push/merge to main triggers tests → build if tests pass
+- **PR Testing**: Runs tests on pull requests without building images
 
 ## License
 

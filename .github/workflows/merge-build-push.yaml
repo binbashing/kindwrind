@@ -6,12 +6,21 @@ on:
     branches: [main]
     types: 
       - completed
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual build'
+        required: false
+        default: 'Manual trigger'
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    # Only run if the test workflow was successful
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Only run if:
+    # 1. Manually triggered via workflow_dispatch, OR
+    # 2. Integration tests passed AND it was triggered by a push to main (not a PR), OR  
+    # 3. Integration tests passed AND it was triggered by workflow_dispatch (automated update checks)
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')) }}
 
     steps:
       - name: Checkout code

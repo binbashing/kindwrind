@@ -1,0 +1,212 @@
+name: Check Updates and Trigger Rebuilds
+
+on:
+  schedule:
+    # Run every day at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch: # Allow manual triggering
+    inputs:
+      create_pr:
+        description: 'Create PR for KinD version update'
+        required: false
+        default: true
+        type: boolean
+      check_type:
+        description: 'What to check'
+        required: false
+        default: 'both'
+        type: choice
+        options:
+        - 'both'
+        - 'kind-only' 
+        - 'docker-dind-only'
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      # ============ KIND VERSION CHECK ============
+      - name: Get current KinD version from VERSION file
+        if: github.event.inputs.check_type != 'docker-dind-only'
+        id: current_version
+        run: |
+          CURRENT_KIND_VERSION=$(cat VERSION)
+          echo "current_kind_version=${CURRENT_KIND_VERSION}" >> $GITHUB_OUTPUT
+          echo "Current KinD version: ${CURRENT_KIND_VERSION}"
+
+      - name: Get latest KinD version from GitHub API
+        if: github.event.inputs.check_type != 'docker-dind-only'
+        id: latest_version
+        run: |
+          LATEST_KIND_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+          echo "latest_kind_version=${LATEST_KIND_VERSION}" >> $GITHUB_OUTPUT
+          echo "Latest KinD version: ${LATEST_KIND_VERSION}"
+          
+          # Get release info
+          RELEASE_URL=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | jq -r '.html_url')
+          RELEASE_DATE=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | jq -r '.published_at')
+          echo "release_url=${RELEASE_URL}" >> $GITHUB_OUTPUT
+          echo "release_date=${RELEASE_DATE}" >> $GITHUB_OUTPUT
+
+      - name: Compare KinD versions
+        if: github.event.inputs.check_type != 'docker-dind-only'
+        id: kind_version_check
+        run: |
+          CURRENT="${{ steps.current_version.outputs.current_kind_version }}"
+          LATEST="${{ steps.latest_version.outputs.latest_kind_version }}"
+          
+          if [ "${CURRENT}" != "${LATEST}" ]; then
+            echo "kind_version_changed=true" >> $GITHUB_OUTPUT
+            echo "KinD version change detected: ${CURRENT} -> ${LATEST}"
+          else
+            echo "kind_version_changed=false" >> $GITHUB_OUTPUT
+            echo "No KinD version change detected"
+          fi
+
+      # ============ DOCKER DIND UPDATE CHECK ============
+      - name: Check Docker DinD vs our image update times
+        if: github.event.inputs.check_type != 'kind-only'
+        id: dind_update_check
+        run: |
+          # Get Docker DinD last updated time from Docker Hub API
+          DIND_UPDATED=$(curl -s "https://registry.hub.docker.com/v2/repositories/library/docker/tags/dind/" | jq -r '.last_updated')
+          DIND_TIMESTAMP=$(date -d "${DIND_UPDATED}" +%s)
+          
+          # Get our latest image update time from Docker Hub API
+          OUR_UPDATED=$(curl -s "https://registry.hub.docker.com/v2/repositories/binbashing/kindwrind/tags/latest/" | jq -r '.last_updated')
+          OUR_TIMESTAMP=$(date -d "${OUR_UPDATED}" +%s)
+          
+          echo "Docker DinD last updated: ${DIND_UPDATED}"
+          echo "Our image last updated: ${OUR_UPDATED}"
+          
+          # Compare timestamps
+          if [ ${DIND_TIMESTAMP} -gt ${OUR_TIMESTAMP} ]; then
+            echo "dind_rebuild_needed=true" >> $GITHUB_OUTPUT
+            echo "✅ Docker DinD is newer than our image - rebuild needed"
+            
+            # Calculate hours difference for info
+            HOURS_DIFF=$(( (DIND_TIMESTAMP - OUR_TIMESTAMP) / 3600 ))
+            echo "Docker DinD is ${HOURS_DIFF} hours newer than our image"
+          else
+            echo "dind_rebuild_needed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Our image is up to date with Docker DinD - no rebuild needed"
+            
+            # Calculate how much newer our image is (for info)
+            HOURS_DIFF=$(( (OUR_TIMESTAMP - DIND_TIMESTAMP) / 3600 ))
+            echo "Our image is ${HOURS_DIFF} hours newer than Docker DinD"
+          fi
+
+      # ============ ACTIONS BASED ON CHECKS ============
+      - name: Update KinD version files
+        if: steps.kind_version_check.outputs.kind_version_changed == 'true'
+        run: |
+          LATEST_VERSION="${{ steps.latest_version.outputs.latest_kind_version }}"
+          
+          # Update VERSION file with new KinD version
+          echo "${LATEST_VERSION}" > VERSION
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -m "chore: update KinD version to ${LATEST_VERSION}" || echo "No changes to commit"
+          git push
+
+      - name: Create PR for KinD version update
+        if: steps.kind_version_check.outputs.kind_version_changed == 'true' && (github.event.inputs.create_pr != 'false')
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update KinD version to ${{ steps.latest_version.outputs.latest_kind_version }}"
+          title: "Update KinD version to ${{ steps.latest_version.outputs.latest_kind_version }}"
+          body: |
+            ## KinD Version Update
+            
+            This PR updates KinD from version `${{ steps.current_version.outputs.current_kind_version }}` to `${{ steps.latest_version.outputs.latest_kind_version }}`.
+            
+            ### Changes
+            - Updated `VERSION` file with new KinD version: `${{ steps.latest_version.outputs.latest_kind_version }}`
+            - KinD release: ${{ steps.latest_version.outputs.release_url }}
+            - Release date: ${{ steps.latest_version.outputs.release_date }}
+            
+            ### Testing
+            The integration tests will run automatically to verify the new version works correctly.
+            
+            ---
+            *This PR was created automatically by the update check workflow*
+          branch: update-kind-${{ steps.latest_version.outputs.latest_kind_version }}
+          delete-branch: true
+
+      - name: Trigger integration tests for Docker DinD update
+        if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true'
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: integration-tests.yml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          inputs: |
+            {
+              "trigger_reason": "Docker DinD base image updated - running tests before rebuild"
+            }
+
+      - name: Log Docker DinD trigger
+        if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true'
+        run: echo "✅ Triggered integration tests workflow due to Docker DinD update"
+
+      - name: Keepalive commit
+        if: steps.kind_version_check.outputs.kind_version_changed != 'true' && steps.dind_update_check.outputs.dind_rebuild_needed != 'true'
+        run: |
+          echo "No updates detected - checking if keepalive commit needed"
+          
+          # Prevent workflow suspension by making empty commits after 50+ days of inactivity
+          LAST_COMMIT_DATE=$(git log -1 --format=%ct)
+          CURRENT_DATE=$(date +%s)
+          DAYS_SINCE=$((($CURRENT_DATE - $LAST_COMMIT_DATE) / 86400))
+          
+          echo "Days since last commit: $DAYS_SINCE"
+          
+          if [ $DAYS_SINCE -gt 50 ]; then
+            echo "Making keepalive commit to prevent workflow suspension"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "chore: keepalive commit to prevent workflow suspension (${DAYS_SINCE} days since last activity)"
+            git push
+          else
+            echo "No keepalive commit needed (last commit was $DAYS_SINCE days ago)"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Update Check Summary" >> $GITHUB_STEP_SUMMARY
+          
+          # KinD version summary
+          if [ "${{ github.event.inputs.check_type }}" != "docker-dind-only" ]; then
+            echo "### KinD Version Check" >> $GITHUB_STEP_SUMMARY
+            echo "- Current KinD version: ${{ steps.current_version.outputs.current_kind_version }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Latest KinD version: ${{ steps.latest_version.outputs.latest_kind_version }}" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ steps.kind_version_check.outputs.kind_version_changed }}" == "true" ]; then
+              echo "- ✅ KinD version update detected and processed" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ✅ KinD version is up to date" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          # Docker DinD summary  
+          if [ "${{ github.event.inputs.check_type }}" != "kind-only" ]; then
+            echo "### Docker DinD Update Check" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ steps.dind_update_check.outputs.dind_rebuild_needed }}" == "true" ]; then
+              echo "- ✅ Docker DinD update detected - triggered integration tests" >> $GITHUB_STEP_SUMMARY
+              echo "- Build and push will be triggered automatically after tests pass" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ✅ Our images are up to date with Docker DinD" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
