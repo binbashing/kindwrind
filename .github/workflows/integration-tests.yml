@@ -150,12 +150,8 @@ jobs:
           CUSTOM_K8S_VERSION="v1.27.3"
           echo "Testing with custom Kubernetes version: $CUSTOM_K8S_VERSION"
           
-          # Add KUBERNETES_VERSION environment variable to docker-compose.yml
-          sed -i '/volumes:/i\        environment:' docker-compose.yml
-          sed -i "/environment:/a\            - KUBERNETES_VERSION=$CUSTOM_K8S_VERSION" docker-compose.yml
-          
-          # Start with custom version
-          docker compose up -d
+          # Start with custom version using environment variable
+          KUBERNETES_VERSION=$CUSTOM_K8S_VERSION docker compose up -d
           
           # Wait for cluster with custom version (longer timeout since it needs to pull image)
           echo "Waiting for custom Kubernetes cluster to be ready..."
