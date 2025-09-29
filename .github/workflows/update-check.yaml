@@ -1,4 +1,4 @@
-name: Check Updates and Trigger Rebuilds
+name: Update Check
 
 on:
   schedule:

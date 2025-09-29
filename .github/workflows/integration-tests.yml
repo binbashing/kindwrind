@@ -1,4 +1,4 @@
-name: KinDwRinD Integration Tests
+name: Integration Tests
 
 on:
   push:
