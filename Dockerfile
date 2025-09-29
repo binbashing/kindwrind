@@ -7,13 +7,13 @@ ARG KIND_VERSION
 
 # Set build-time labels
 LABEL org.opencontainers.image.version="${KIND_VERSION}"
-LABEL org.opencontainers.image.title="KinDwRinD"
+LABEL org.opencontainers.image.title="kindwrind"
 LABEL org.opencontainers.image.description="Kubernetes in Docker with Registry in Docker"
 
 # Install dependencies
 RUN apk add --no-cache curl kubectl
 
-# Download and install KinD based on the architecture and version from build argument
+# Download and install Kind based on the architecture and version from build argument
 RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${TARGETARCH} && \
     chmod +x ./kind && \
     mv ./kind /bin/kind && \

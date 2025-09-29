@@ -7,7 +7,7 @@ on:
   workflow_dispatch: # Allow manual triggering
     inputs:
       create_pr:
-        description: 'Create PR for KinD version update'
+        description: 'Create PR for Kind version update'
         required: false
         default: true
         type: boolean
@@ -37,21 +37,21 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y jq
 
       # ============ KIND VERSION CHECK ============
-      - name: Get current KinD version from VERSION file
+      - name: Get current Kind version from VERSION file
         if: github.event.inputs.check_type != 'docker-dind-only'
         id: current_version
         run: |
           CURRENT_KIND_VERSION=$(cat VERSION)
           echo "current_kind_version=${CURRENT_KIND_VERSION}" >> $GITHUB_OUTPUT
-          echo "Current KinD version: ${CURRENT_KIND_VERSION}"
+          echo "Current Kind version: ${CURRENT_KIND_VERSION}"
 
-      - name: Get latest KinD version from GitHub API
+      - name: Get latest Kind version from GitHub API
         if: github.event.inputs.check_type != 'docker-dind-only'
         id: latest_version
         run: |
           LATEST_KIND_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | jq -r '.tag_name' | sed 's/^v//')
           echo "latest_kind_version=${LATEST_KIND_VERSION}" >> $GITHUB_OUTPUT
-          echo "Latest KinD version: ${LATEST_KIND_VERSION}"
+          echo "Latest Kind version: ${LATEST_KIND_VERSION}"
           
           # Get release info
           RELEASE_URL=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | jq -r '.html_url')
@@ -59,7 +59,7 @@ jobs:
           echo "release_url=${RELEASE_URL}" >> $GITHUB_OUTPUT
           echo "release_date=${RELEASE_DATE}" >> $GITHUB_OUTPUT
 
-      - name: Compare KinD versions
+      - name: Compare Kind versions
         if: github.event.inputs.check_type != 'docker-dind-only'
         id: kind_version_check
         run: |
@@ -68,10 +68,10 @@ jobs:
           
           if [ "${CURRENT}" != "${LATEST}" ]; then
             echo "kind_version_changed=true" >> $GITHUB_OUTPUT
-            echo "KinD version change detected: ${CURRENT} -> ${LATEST}"
+            echo "Kind version change detected: ${CURRENT} -> ${LATEST}"
           else
             echo "kind_version_changed=false" >> $GITHUB_OUTPUT
-            echo "No KinD version change detected"
+            echo "No Kind version change detected"
           fi
 
       # ============ DOCKER DIND UPDATE CHECK ============
@@ -108,35 +108,35 @@ jobs:
           fi
 
       # ============ ACTIONS BASED ON CHECKS ============
-      - name: Update KinD version files
+      - name: Update Kind version files
         if: steps.kind_version_check.outputs.kind_version_changed == 'true'
         run: |
           LATEST_VERSION="${{ steps.latest_version.outputs.latest_kind_version }}"
           
-          # Update VERSION file with new KinD version
+          # Update VERSION file with new Kind version
           echo "${LATEST_VERSION}" > VERSION
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add VERSION
-          git commit -m "chore: update KinD version to ${LATEST_VERSION}" || echo "No changes to commit"
+          git commit -m "chore: update Kind version to ${LATEST_VERSION}" || echo "No changes to commit"
           git push
 
-      - name: Create PR for KinD version update
+      - name: Create PR for Kind version update
         if: steps.kind_version_check.outputs.kind_version_changed == 'true' && (github.event.inputs.create_pr != 'false')
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update KinD version to ${{ steps.latest_version.outputs.latest_kind_version }}"
-          title: "Update KinD version to ${{ steps.latest_version.outputs.latest_kind_version }}"
+          commit-message: "chore: update Kind version to ${{ steps.latest_version.outputs.latest_kind_version }}"
+          title: "Update Kind version to ${{ steps.latest_version.outputs.latest_kind_version }}"
           body: |
-            ## KinD Version Update
+            ## Kind Version Update
             
-            This PR updates KinD from version `${{ steps.current_version.outputs.current_kind_version }}` to `${{ steps.latest_version.outputs.latest_kind_version }}`.
+            This PR updates Kind from version `${{ steps.current_version.outputs.current_kind_version }}` to `${{ steps.latest_version.outputs.latest_kind_version }}`.
             
             ### Changes
-            - Updated `VERSION` file with new KinD version: `${{ steps.latest_version.outputs.latest_kind_version }}`
-            - KinD release: ${{ steps.latest_version.outputs.release_url }}
+            - Updated `VERSION` file with new Kind version: `${{ steps.latest_version.outputs.latest_kind_version }}`
+            - Kind release: ${{ steps.latest_version.outputs.release_url }}
             - Release date: ${{ steps.latest_version.outputs.release_date }}
             
             ### Testing
@@ -188,15 +188,15 @@ jobs:
         run: |
           echo "## Update Check Summary" >> $GITHUB_STEP_SUMMARY
           
-          # KinD version summary
+          # Kind version summary
           if [ "${{ github.event.inputs.check_type }}" != "docker-dind-only" ]; then
-            echo "### KinD Version Check" >> $GITHUB_STEP_SUMMARY
-            echo "- Current KinD version: ${{ steps.current_version.outputs.current_kind_version }}" >> $GITHUB_STEP_SUMMARY
-            echo "- Latest KinD version: ${{ steps.latest_version.outputs.latest_kind_version }}" >> $GITHUB_STEP_SUMMARY
+            echo "### Kind Version Check" >> $GITHUB_STEP_SUMMARY
+            echo "- Current Kind version: ${{ steps.current_version.outputs.current_kind_version }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Latest Kind version: ${{ steps.latest_version.outputs.latest_kind_version }}" >> $GITHUB_STEP_SUMMARY
             if [ "${{ steps.kind_version_check.outputs.kind_version_changed }}" == "true" ]; then
-              echo "- ✅ KinD version update detected and processed" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Kind version update detected and processed" >> $GITHUB_STEP_SUMMARY
             else
-              echo "- ✅ KinD version is up to date" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Kind version is up to date" >> $GITHUB_STEP_SUMMARY
             fi
           fi
           

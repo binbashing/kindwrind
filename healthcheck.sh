@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Health check script for KinDwRinD
+# Health check script for kindwrind
 # Checks that both Kubernetes API and Docker Registry are accessible
 
 set -e

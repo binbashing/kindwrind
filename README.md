@@ -58,7 +58,7 @@ docker push localhost:5000/nginx:latest
 kubectl create deployment hello-server --image=localhost:5000/nginx:latest 
 ```
 
-> **Note**: You can specify a custom Kubernetes version using the `KUBERNETES_VERSION` environment variable (e.g., `KUBERNETES_VERSION=v1.33.0`). When set, KinD will create the cluster using `--image kindest/node:$KUBERNETES_VERSION`.
+> **Note**: You can specify a custom Kubernetes version using the `KUBERNETES_VERSION` environment variable (e.g., `KUBERNETES_VERSION=v1.33.0`). When set, Kind will create the cluster using `--image kindest/node:$KUBERNETES_VERSION`.
 
 ## License
 

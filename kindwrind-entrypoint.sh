@@ -35,10 +35,10 @@ fi
 
 # Create KinD cluster
 if [ -n "$KUBERNETES_VERSION" ]; then
-    echo "Creating KinD cluster with Kubernetes version: $KUBERNETES_VERSION"
+    echo "Creating Kind cluster with Kubernetes version: $KUBERNETES_VERSION"
     kind create cluster --config /kindind-config.yaml --name kindwrind --image "kindest/node:$KUBERNETES_VERSION" --wait 5m
 else
-    echo "Creating KinD cluster with default Kubernetes version"
+    echo "Creating Kind cluster with default Kubernetes version"
     kind create cluster --config /kindind-config.yaml --name kindwrind --wait 5m
 fi
 
