@@ -13,27 +13,23 @@ LABEL org.opencontainers.image.description="Kubernetes in Docker with Registry i
 # Install dependencies
 RUN apk add --no-cache curl kubectl
 
-# Download and install Kind based on the architecture and version from build argument
-RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${TARGETARCH} && \
-    chmod +x ./kind && \
-    mv ./kind /bin/kind && \
-    mkdir /kubeconfig
-
-# Set default Kubeconfig path
-ENV KUBECONFIG=/kubeconfig/config
-
 # Copy necessary files
 COPY kindind-config.yaml /kindind-config.yaml
 COPY kindwrind-entrypoint.sh /kindwrind-entrypoint.sh
 COPY healthcheck.sh /healthcheck.sh
+ADD https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${TARGETARCH} /bin/kind
+
+# Set default Kubeconfig path
+RUN mkdir /kubeconfig
+ENV KUBECONFIG=/kubeconfig/config
 
 # Make scripts executable
-RUN chmod +x /kindwrind-entrypoint.sh /healthcheck.sh
+RUN chmod +x /bin/kind /kindwrind-entrypoint.sh /healthcheck.sh
 
 # Expose ports
 EXPOSE 6443 5000
 
-# Add health check
+# Set the health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD /healthcheck.sh
 
