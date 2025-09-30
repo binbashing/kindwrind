@@ -11,7 +11,7 @@ LABEL org.opencontainers.image.title="kindwrind"
 LABEL org.opencontainers.image.description="Kubernetes in Docker with Registry in Docker"
 
 # Install dependencies
-RUN apk add --no-cache curl kubectl
+RUN apk add --no-cache curl
 
 # Copy necessary files
 COPY kindind-config.yaml /kindind-config.yaml
