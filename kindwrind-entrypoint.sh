@@ -43,7 +43,11 @@ else
 fi
 
 # Setup Docker Registy
+echo "Starting Docker registry 🐋 ..."
+docker pull -q registry:2
 docker run -d --name registry --restart=always --net=kind -p 5000:5000 registry:2
+echo "Docker registry started on port 5000"
+echo "kindwrind is ready! 💚"
 
 # Keep script running to maintain control over the process and handle signals
 wait $!
