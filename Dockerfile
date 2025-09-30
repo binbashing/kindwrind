@@ -10,6 +10,9 @@ LABEL org.opencontainers.image.version="${KIND_VERSION}"
 LABEL org.opencontainers.image.title="kindwrind"
 LABEL org.opencontainers.image.description="Kubernetes in Docker with Registry in Docker"
 
+# Set default Kubeconfig path
+ENV KUBECONFIG=/kubeconfig/config
+
 # Install dependencies
 RUN apk add --no-cache curl
 
@@ -18,10 +21,6 @@ COPY kindind-config.yaml /kindind-config.yaml
 COPY kindwrind-entrypoint.sh /kindwrind-entrypoint.sh
 COPY healthcheck.sh /healthcheck.sh
 ADD https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${TARGETARCH} /bin/kind
-
-# Set default Kubeconfig path
-RUN mkdir /kubeconfig
-ENV KUBECONFIG=/kubeconfig/config
 
 # Make scripts executable
 RUN chmod +x /bin/kind /kindwrind-entrypoint.sh /healthcheck.sh

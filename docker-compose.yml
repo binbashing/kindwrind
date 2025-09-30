@@ -1,15 +1,12 @@
 services:
   kindwrind:
-    build:
-      context: .
-      args:
-        KIND_VERSION: ${KIND_VERSION}
+    image: binbashing/kindwrind:${TAG_OVERRIDE:-latest}
     container_name: kindwrind
     privileged: true
     ports:
       - 6443:6443
       - 5000:5000
     volumes:
-      - ${KUBECONFIG_DIR:-~/.kube}:/kubeconfig
+      - ${KUBECONFIG:-~/.kube/config}:/kubeconfig/config
     environment:
       - KUBERNETES_VERSION

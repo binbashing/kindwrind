@@ -38,58 +38,23 @@ jobs:
 
       - name: Build kindwrind image
         run: |
-          docker build \
+          docker buildx build \
             --build-arg KIND_VERSION=${{ steps.version.outputs.kind_version }} \
-            -t kindwrind-test .
-      
-      - name: Verify Docker command starts properly
-        run: |
-          # Test that the direct Docker command starts correctly
-          docker run -d \
-            --privileged \
-            --name kindwrind-direct \
-            -p 6444:6443 \
-            -p 5001:5000 \
-            -v /tmp/kube-direct:/kubeconfig \
-            kindwrind-test
-          
-          # Wait briefly and check container is running
-          sleep 10
-          if ! docker ps | grep -q kindwrind-direct; then
-            echo "Error: Direct Docker container failed to start"
-            docker logs kindwrind-direct
-            exit 1
-          fi
-          echo "Docker command approach verified"
-          docker stop kindwrind-direct
+            --load \
+            -t binbashing/kindwrind:test \
+            .
 
-      - name: Run using Docker Compose for full testing
+      - name: Set up kubeconfig
         run: |
-          # Read VERSION file and start with docker compose
-          KIND_VERSION=$(cat VERSION)
-          KIND_VERSION=$KIND_VERSION docker compose up -d
+          # Ensure kubeconfig directory and file exist
+          mkdir -p ~/.kube
+          touch ~/.kube/config
+          chmod 600 ~/.kube/config
 
-      - name: Wait for Kubernetes cluster (90s)
+      - name: Start kindwrind using Docker Compose
         run: |
-          echo "Waiting for Kubernetes cluster to be ready..."
-          count=0
-          while [ $count -lt 90 ]; do
-            sleep 1
-            if docker exec kindwrind kubectl get nodes 2>/dev/null | grep -q "Ready"; then
-              echo "Kubernetes cluster is ready!"
-              break
-            fi
-            count=$((count+1))
-            if [ $((count % 10)) -eq 0 ]; then
-              echo "Still waiting... ($count/90s)"
-            fi
-          done
-          
-          if [ $count -eq 90 ]; then
-            echo "Timeout waiting for Kubernetes cluster"
-            docker logs kindwrind
-            exit 1
-          fi
+          export TAG_OVERRIDE=test 
+          docker compose up -d --wait --wait-timeout 90
 
       - name: Test registry functionality
         run: |
@@ -101,39 +66,22 @@ jobs:
           
           # Push to local registry
           docker push localhost:5000/nginx-test:latest
-          
+      
+      - name: Test kubectl functionality
+        run: |          
+          # Verify kubectl is working
+          kubectl cluster-info
+
+      - name: Test Kubernetes functionality
+        run: | 
           # Create deployment using the image from local registry
-          docker exec kindwrind kubectl create deployment test-nginx --image=localhost:5000/nginx-test:latest
+          kubectl create deployment test-nginx --image=localhost:5000/nginx-test:latest
           
           # Wait for deployment to be ready
-          count=0
-          while [ $count -lt 60 ]; do
-            sleep 1
-            if docker exec kindwrind kubectl get deployment test-nginx 2>/dev/null | grep -q "1/1"; then
-              echo "Deployment is ready!"
-              break
-            fi
-            count=$((count+1))
-            if [ $((count % 10)) -eq 0 ]; then
-              echo "Waiting for deployment... ($count/60s)"
-            fi
-          done
-          
-          if [ $count -eq 60 ]; then
-            echo "Deployment failed"
-            docker exec kindwrind kubectl describe deployment test-nginx
-            docker exec kindwrind kubectl describe pods -l app=test-nginx
-            exit 1
-          fi
-          
-          # Verify pod is running
-          docker exec kindwrind kubectl get pods -l app=test-nginx -o wide
+          kubectl wait --for=condition=available --timeout=60s deployment/test-nginx
 
-      - name: Test default Kubernetes version (current behavior)
-        run: |
-          # Check the current Kubernetes version (should be whatever Kind defaults to)
-          K8S_VERSION=$(docker exec kindwrind kubectl version --client=false -o json | jq -r '.serverVersion.gitVersion')
-          echo "✅ Default Kubernetes version: $K8S_VERSION"
+          # Wait for pods to be fully ready
+          kubectl wait --for=condition=ready --timeout=30s pod -l app=test-nginx
 
       - name: Clean up
         if: always()
