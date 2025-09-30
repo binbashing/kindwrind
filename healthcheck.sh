@@ -6,7 +6,7 @@
 set -e
 
 # Check Kubernetes API health endpoint
-if ! curl -f http://localhost:6443/healthz >/dev/null 2>&1; then
+if ! curl --insecure -f https://localhost:6443/readyz >/dev/null 2>&1; then
     echo "Kubernetes API not healthy"
     exit 1
 fi
