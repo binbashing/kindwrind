@@ -2,7 +2,7 @@ name: Build and Push Docker Image
 
 on:
   workflow_run:
-    workflows: ["kindwrind Integration Tests"]
+    workflows: ["Integration Tests"]
     branches: [main]
     types: 
       - completed
