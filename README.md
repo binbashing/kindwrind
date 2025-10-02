@@ -5,7 +5,7 @@
 ![Integration Tests](https://github.com/binbashing/kindwrind/actions/workflows/integration-tests.yml/badge.svg)
 ![Update Check](https://github.com/binbashing/kindwrind/actions/workflows/update-check.yaml/badge.svg)
 <p align="left">
-    <img src="kindwrind.png" alt="kindwrind logo" width="300"/>
+    <img src="https://raw.githubusercontent.com/binbashing/kindwrind/main/kindwrind.png" alt="kindwrind logo" width="300"/>
 </p>
 
 **kindwrind** is a tool for running [Kind](https://kind.sigs.k8s.io/) and [Registry](https://hub.docker.com/_/registry) inside a single container using [DinD](https://hub.docker.com/_/docker).
