@@ -6,12 +6,13 @@ on:
     branches: [main]
     types: 
       - completed
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      reason:
-        description: 'Reason for manual build'
+      trigger_reason:
+        description: 'Reason for calling build workflow'
         required: false
-        default: 'Manual trigger'
+        default: 'Called from another workflow'
+        type: string
 
 jobs:
   build-and-push:

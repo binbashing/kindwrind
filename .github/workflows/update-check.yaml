@@ -11,15 +11,6 @@ on:
         required: false
         default: true
         type: boolean
-      check_type:
-        description: 'What to check'
-        required: false
-        default: 'both'
-        type: choice
-        options:
-        - 'both'
-        - 'kind-only' 
-        - 'docker-dind-only'
 
 jobs:
   check-updates:
@@ -38,7 +29,6 @@ jobs:
 
       # ============ KIND VERSION CHECK ============
       - name: Get current Kind version from VERSION file
-        if: github.event.inputs.check_type != 'docker-dind-only'
         id: current_version
         run: |
           CURRENT_KIND_VERSION=$(cat VERSION)
@@ -46,7 +36,6 @@ jobs:
           echo "Current Kind version: ${CURRENT_KIND_VERSION}"
 
       - name: Get latest Kind version from GitHub API
-        if: github.event.inputs.check_type != 'docker-dind-only'
         id: latest_version
         run: |
           LATEST_KIND_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | jq -r '.tag_name' | sed 's/^v//')
@@ -60,7 +49,6 @@ jobs:
           echo "release_date=${RELEASE_DATE}" >> $GITHUB_OUTPUT
 
       - name: Compare Kind versions
-        if: github.event.inputs.check_type != 'docker-dind-only'
         id: kind_version_check
         run: |
           CURRENT="${{ steps.current_version.outputs.current_kind_version }}"
@@ -76,7 +64,6 @@ jobs:
 
       # ============ DOCKER DIND UPDATE CHECK ============
       - name: Check Docker DinD vs our image update times
-        if: github.event.inputs.check_type != 'kind-only'
         id: dind_update_check
         run: |
           # Get Docker DinD last updated time from Docker Hub API
@@ -147,20 +134,22 @@ jobs:
           branch: update-kind-${{ steps.latest_version.outputs.latest_kind_version }}
           delete-branch: true
 
-      - name: Trigger integration tests for Docker DinD update
+      - name: Run integration tests for Docker DinD update
+        id: integration_tests
         if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true'
-        uses: benc-uk/workflow-dispatch@v1
+        uses: ./.github/workflows/integration-tests.yml
         with:
-          workflow: integration-tests.yml
-          token: ${{ secrets.GITHUB_TOKEN }}
-          inputs: |
-            {
-              "trigger_reason": "Docker DinD base image updated - running tests before rebuild"
-            }
+          trigger_reason: "Docker DinD base image updated - running tests before rebuild"
 
-      - name: Log Docker DinD trigger
-        if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true'
-        run: echo "✅ Triggered integration tests workflow due to Docker DinD update"
+      - name: Build and push after Docker DinD update
+        if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true' && steps.integration_tests.conclusion == 'success'
+        uses: ./.github/workflows/merge-build-push.yaml
+        with:
+          trigger_reason: "Docker DinD base image updated - rebuilding after successful tests"
+
+      - name: Log Docker DinD rebuild completion
+        if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true' && steps.integration_tests.conclusion == 'success'
+        run: echo "✅ Completed integration tests and image rebuild due to Docker DinD update"
 
       - name: Keepalive commit
         if: steps.kind_version_check.outputs.kind_version_changed != 'true' && steps.dind_update_check.outputs.dind_rebuild_needed != 'true'
@@ -187,26 +176,19 @@ jobs:
       - name: Summary
         run: |
           echo "## Update Check Summary" >> $GITHUB_STEP_SUMMARY
-          
-          # Kind version summary
-          if [ "${{ github.event.inputs.check_type }}" != "docker-dind-only" ]; then
-            echo "### Kind Version Check" >> $GITHUB_STEP_SUMMARY
-            echo "- Current Kind version: ${{ steps.current_version.outputs.current_kind_version }}" >> $GITHUB_STEP_SUMMARY
-            echo "- Latest Kind version: ${{ steps.latest_version.outputs.latest_kind_version }}" >> $GITHUB_STEP_SUMMARY
-            if [ "${{ steps.kind_version_check.outputs.kind_version_changed }}" == "true" ]; then
-              echo "- ✅ Kind version update detected and processed" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "- ✅ Kind version is up to date" >> $GITHUB_STEP_SUMMARY
-            fi
+          echo "### Kind Version Check" >> $GITHUB_STEP_SUMMARY
+          echo "- Current Kind version: ${{ steps.current_version.outputs.current_kind_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Latest Kind version: ${{ steps.latest_version.outputs.latest_kind_version }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.kind_version_check.outputs.kind_version_changed }}" == "true" ]; then
+            echo "- ✅ Kind version update detected and processed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ✅ Kind version is up to date" >> $GITHUB_STEP_SUMMARY
           fi
           
-          # Docker DinD summary  
-          if [ "${{ github.event.inputs.check_type }}" != "kind-only" ]; then
-            echo "### Docker DinD Update Check" >> $GITHUB_STEP_SUMMARY
-            if [ "${{ steps.dind_update_check.outputs.dind_rebuild_needed }}" == "true" ]; then
-              echo "- ✅ Docker DinD update detected - triggered integration tests" >> $GITHUB_STEP_SUMMARY
-              echo "- Build and push will be triggered automatically after tests pass" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "- ✅ Our images are up to date with Docker DinD" >> $GITHUB_STEP_SUMMARY
-            fi
+          echo "### Docker DinD Update Check" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.dind_update_check.outputs.dind_rebuild_needed }}" == "true" ]; then
+            echo "- ✅ Docker DinD update detected - triggered integration tests" >> $GITHUB_STEP_SUMMARY
+            echo "- Build and push will be triggered automatically after tests pass" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ✅ Our images are up to date with Docker DinD" >> $GITHUB_STEP_SUMMARY
           fi

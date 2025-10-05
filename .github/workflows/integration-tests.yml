@@ -5,12 +5,13 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:
+  workflow_call:
     inputs:
       trigger_reason:
-        description: 'Reason for manual test trigger'
+        description: 'Reason for calling workflow'
         required: false
-        default: 'Manual trigger'
+        default: 'Called from another workflow'
+        type: string
 
 jobs:
   test-kindwrind:
