@@ -12,11 +12,17 @@ on:
         required: false
         default: 'Called from another workflow'
         type: string
+    outputs:
+      test_result:
+        description: 'Result of integration tests'
+        value: ${{ jobs.test-kindwrind.outputs.result }}
 
 jobs:
   test-kindwrind:
     name: Test kindwrind Functionality
     runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.test_conclusion.outputs.result }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -88,3 +94,13 @@ jobs:
         if: always()
         run: |
           docker compose down || true
+
+      - name: Set test conclusion
+        id: test_conclusion
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "result=success" >> $GITHUB_OUTPUT
+          else
+            echo "result=failure" >> $GITHUB_OUTPUT
+          fi

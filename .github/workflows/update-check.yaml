@@ -142,13 +142,13 @@ jobs:
           trigger_reason: "Docker DinD base image updated - running tests before rebuild"
 
       - name: Build and push after Docker DinD update
-        if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true' && steps.integration_tests.conclusion == 'success'
+        if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true' && steps.integration_tests.outputs.test_result == 'success'
         uses: ./.github/workflows/merge-build-push.yaml
         with:
           trigger_reason: "Docker DinD base image updated - rebuilding after successful tests"
 
       - name: Log Docker DinD rebuild completion
-        if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true' && steps.integration_tests.conclusion == 'success'
+        if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true' && steps.integration_tests.outputs.test_result == 'success'
         run: echo "✅ Completed integration tests and image rebuild due to Docker DinD update"
 
       - name: Keepalive commit
