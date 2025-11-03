@@ -18,6 +18,11 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    outputs:
+      dind_rebuild_needed: ${{ steps.dind_update_check.outputs.dind_rebuild_needed }}
+      kind_version_changed: ${{ steps.kind_version_check.outputs.kind_version_changed }}
+      current_kind_version: ${{ steps.current_version.outputs.current_kind_version }}
+      latest_kind_version: ${{ steps.latest_version.outputs.latest_kind_version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -134,25 +139,41 @@ jobs:
           branch: update-kind-${{ steps.latest_version.outputs.latest_kind_version }}
           delete-branch: true
 
-      - name: Run integration tests for Docker DinD update
-        id: integration_tests
+      - name: Log Docker DinD update detection
         if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true'
-        uses: ./.github/workflows/integration-tests.yml
-        with:
-          trigger_reason: "Docker DinD base image updated - running tests before rebuild"
+        run: echo "✅ Docker DinD update detected - will trigger integration tests workflow"
 
-      - name: Build and push after Docker DinD update
-        if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true' && steps.integration_tests.outputs.test_result == 'success'
-        uses: ./.github/workflows/merge-build-push.yaml
-        with:
-          trigger_reason: "Docker DinD base image updated - rebuilding after successful tests"
+  # Separate job to run integration tests when Docker DinD update is detected
+  run-integration-tests:
+    needs: check-updates
+    if: needs.check-updates.outputs.dind_rebuild_needed == 'true'
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      trigger_reason: "Docker DinD base image updated - running tests before rebuild"
 
-      - name: Log Docker DinD rebuild completion
-        if: steps.dind_update_check.outputs.dind_rebuild_needed == 'true' && steps.integration_tests.outputs.test_result == 'success'
-        run: echo "✅ Completed integration tests and image rebuild due to Docker DinD update"
+  # Separate job to build and push after successful tests
+  build-and-push:
+    needs: [check-updates, run-integration-tests]
+    if: needs.check-updates.outputs.dind_rebuild_needed == 'true' && needs.run-integration-tests.outputs.test_result == 'success'
+    uses: ./.github/workflows/merge-build-push.yaml
+    with:
+      trigger_reason: "Docker DinD base image updated - rebuilding after successful tests"
+
+  # Separate job for cleanup and summary tasks
+  cleanup-and-summary:
+    needs: [check-updates, run-integration-tests, build-and-push]
+    if: always()  # Run regardless of previous job results
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Keepalive commit
-        if: steps.kind_version_check.outputs.kind_version_changed != 'true' && steps.dind_update_check.outputs.dind_rebuild_needed != 'true'
+        if: needs.check-updates.outputs.kind_version_changed != 'true' && needs.check-updates.outputs.dind_rebuild_needed != 'true'
         run: |
           echo "No updates detected - checking if keepalive commit needed"
           
@@ -177,16 +198,16 @@ jobs:
         run: |
           echo "## Update Check Summary" >> $GITHUB_STEP_SUMMARY
           echo "### Kind Version Check" >> $GITHUB_STEP_SUMMARY
-          echo "- Current Kind version: ${{ steps.current_version.outputs.current_kind_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Latest Kind version: ${{ steps.latest_version.outputs.latest_kind_version }}" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.kind_version_check.outputs.kind_version_changed }}" == "true" ]; then
+          echo "- Current Kind version: ${{ needs.check-updates.outputs.current_kind_version || 'Unknown' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Latest Kind version: ${{ needs.check-updates.outputs.latest_kind_version || 'Unknown' }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.check-updates.outputs.kind_version_changed }}" == "true" ]; then
             echo "- ✅ Kind version update detected and processed" >> $GITHUB_STEP_SUMMARY
           else
             echo "- ✅ Kind version is up to date" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "### Docker DinD Update Check" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.dind_update_check.outputs.dind_rebuild_needed }}" == "true" ]; then
+          if [ "${{ needs.check-updates.outputs.dind_rebuild_needed }}" == "true" ]; then
             echo "- ✅ Docker DinD update detected - triggered integration tests" >> $GITHUB_STEP_SUMMARY
             echo "- Build and push will be triggered automatically after tests pass" >> $GITHUB_STEP_SUMMARY
           else
